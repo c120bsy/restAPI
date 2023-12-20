@@ -1,95 +1,38 @@
 const express = require('express');
 const axios = require('axios');
-const mysql = require('mysql2/promise');
 
 const app = express();
-const port = 3000;
+const port = 8000; // Ganti port sesuai kebutuhan Anda
 
-app.use(express.json());
+app.get('/', (req, res) => {
+  res.json({ message: 'Welcome to Mobile Developer API' });
+});
 
-// Konfigurasi koneksi ke Google Cloud SQL
-const dbConfig = {
-  host: 'your-google-cloud-sql-ip',
-  user: 'your-database-user',
-  password: 'your-database-password',
-  database: 'your-database-name',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-};
+app.post('/upload', (req, res) => {
+  // Tambahkan logika untuk mengunggah gambar ke API ML di sini
+  res.json({ message: 'Image uploaded successfully' });
+});
 
-// Endpoint untuk menyimpan data warna urine ke database
-app.post('/save_urine_color', async (req, res) => {
+app.get('/predict', async (req, res) => {
   try {
-    const { color } = req.body;
+    // Panggil endpoint API ML untuk mendapatkan prediksi
+    const mlApiUrl = 'http://34.128.118.210:8000/docs';
+    const mlApiResponse = await axios.get(mlApiUrl);
 
-    // Buat koneksi ke database
-    const connection = await mysql.createConnection(dbConfig);
+    // Proses respons dari API ML jika diperlukan
+    const mobileApiResponse = {
+      mlPrediction: mlApiResponse.data['model-prediction'],
+      mlConfidenceScore: mlApiResponse.data['model-prediction-confidence-score'],
+      filename: mlApiResponse.data.filename,
+    };
 
-    // Simpan data warna urine ke database
-    const [result] = await connection.execute('INSERT INTO urine_colors (color) VALUES (?)', [color]);
-
-    // Tutup koneksi
-    await connection.end();
-
-    res.json({ status: 'success', message: 'Data saved to database.' });
+    res.json(mobileApiResponse);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+    console.error('Error calling ML API:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-// Endpoint untuk mengambil data warna urine dari database
-app.get('/get_urine_colors', async (req, res) => {
-  try {
-    // Buat koneksi ke database
-    const connection = await mysql.createConnection(dbConfig);
-
-    // Ambil semua data warna urine dari database
-    const [rows] = await connection.execute('SELECT * FROM urine_colors');
-
-    // Tutup koneksi
-    await connection.end();
-
-    res.json({ status: 'success', data: rows });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
-  }
-});
-
-// Endpoint untuk mengonsumsi API deteksi warna urine
-app.post('/detect_urine_color_mobile', async (req, res) => {
-  try {
-    // Ambil data gambar dari payload yang diterima
-    const imageData = req.body.imageData;
-
-    // Kirim permintaan ke endpoint API deteksi warna urine
-    const response = await axios.post('http://34.128.118.210:5000/predict', {
-      imageData: imageData,
-    });
-
-    // Simpan data warna urine ke database
-    const { color } = response.data;
-
-    // Buat koneksi ke database
-    const connection = await mysql.createConnection(dbConfig);
-
-    // Simpan data warna urine ke database
-    const [result] = await connection.execute('INSERT INTO urine_colors (color) VALUES (?)', [color]);
-
-    // Tutup koneksi
-    await connection.end();
-
-    // Kirim kembali respons dari API deteksi warna urine ke pengguna mobile
-    res.json(response.data);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
-  }
-});
-
-// Jalankan server
 app.listen(port, () => {
-  console.log(`Server berjalan di http://localhost:${port}`);
+  console.log(`Server is running at http://localhost:${port}`);
 });
